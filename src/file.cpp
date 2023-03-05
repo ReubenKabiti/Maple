@@ -44,7 +44,10 @@ bool File::open(OpenType type)
 void File::close()
 {
     if (m_isOpen)
+    {
         fclose(m_fp);
+        m_isOpen = false;
+    }
 }
 char File::read()
 {
