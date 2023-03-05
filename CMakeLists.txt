@@ -7,7 +7,8 @@ project(
 add_executable(
     maple
     src/file.cpp
-    src/main.cpp
+    src/xmlparser.cpp
+    tests/main.cpp
 )
 target_include_directories(
     maple

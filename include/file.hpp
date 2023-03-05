@@ -4,6 +4,7 @@
 
 #pragma once
 #include <stdio.h>
+#include <string>
 #include "device.hpp"
 
 class File : Device
