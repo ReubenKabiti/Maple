@@ -1,4 +1,5 @@
 #include "xml_parser.h"
+#include <iostream>
 
 XMLParser::XMLParser(string text)
 {
@@ -41,6 +42,8 @@ shared_ptr<XMLTag> XMLParser::Parse()
 				if (mParentStack.empty())
 					break;
 				mParentStack.pop();
+				if (mParentStack.top())
+					mParentStack.top()->children.push_back(tag);
 			}
 		}
 	}
@@ -76,6 +79,7 @@ shared_ptr<XMLTag> XMLParser::ProcessTag(int i, int j)
 		{
 			if (mText[i] != ' ' && mText[i] != '\n' && mText[i] != '\t' && mText[i] != '\b')
 				break;
+			i++;
 		};
 	};
 
@@ -85,9 +89,11 @@ shared_ptr<XMLTag> XMLParser::ProcessTag(int i, int j)
 		{
 			if (mText[i] == ' ' && mText[i] == '\n' && mText[i] == '\t' && mText[i] == '\b')
 				break;
+			i++;
 		};
 	};
 
+	i++;
 	SkipWhiteSpaces();
 	// check if we are not at the end yet
 	if (i == j)
@@ -121,39 +127,14 @@ shared_ptr<XMLTag> XMLParser::ProcessTag(int i, int j)
 			if (mText[i] == '"')
 				break;
 		i++;
-		for (; i < j; i++)
+		// look for the end quote
+		for (; i < j && mText[i] != '"'; i++)
 			attrValue += mText[i];
 		tagAttr[attrName] = attrValue;
+		i++;
 	}
 	auto tag = make_shared<XMLTag>();
 	tag->name = tagName;
 	tag->attribs = tagAttr;
 	return tag;
-}
-
-int XMLParser::GetElementStart(int s)
-{
-	for (; s < (int)mText.size(); s++)
-	{
-		// have we found the starting tag?
-		if (mText[s] == '<')
-		{
-			// is this not the end tag?
-			if (mText[s + 1] != '/')
-				return s;
-		}
-	}
-
-	// not found
-	return -1;
-}
-
-int XMLParser::GetElementEnd(int s)
-{
-	for (; s < (int)mText.size(); s++)
-	{
-		if (mText[s] == '>')
-			return s;
-	}
-	return -1;
 }

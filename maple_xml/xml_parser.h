@@ -7,8 +7,6 @@ public:
 	XMLParser(string text);
 	shared_ptr<XMLTag> Parse();
 private:
-	int GetElementStart(int s);
-	int GetElementEnd(int s);
 	shared_ptr<XMLTag> GetRoot(shared_ptr<XMLTag> tag);
 	shared_ptr<XMLTag> ProcessTag(int i, int j);
 private:
