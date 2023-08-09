@@ -1,6 +1,6 @@
 #include "xml_parser.h"
 
-XMLParser(string text)
+XMLParser::XMLParser(string text)
 {
 	mText = text;
 }
@@ -28,12 +28,15 @@ shared_ptr<XMLTag> XMLParser::Parse()
 					if (mText[j] == '>')
 						break;
 				}
-				tag = ProcessTag(i, j);
+				auto tag_temp = ProcessTag(i, j);
+				if (!tag_temp)
+					continue;
+				tag = tag_temp;
 				tag->parent = mParentStack.top();
 				mParentStack.push(tag);
 			}
 			// or a closing tag
-			else
+			else if (mText[i + 1] == '/')
 			{
 				if (mParentStack.empty())
 					break;
@@ -56,9 +59,76 @@ shared_ptr<XMLTag> XMLParser::GetRoot(shared_ptr<XMLTag> tag)
 	return tag;
 }
 
-shared_ptr<XMLTag> XMLParser::ProcessTag(shared_ptr<XMLTag> tag)
+shared_ptr<XMLTag> XMLParser::ProcessTag(int i, int j)
 {
-	return nullptr;
+	// steps
+	// 1 - get the tag name
+	// 2 - get the next attrib name
+	// 3 - get the next attrib value
+	// 4 - repeat 2 to 3 until we reach the end
+	//
+	
+	// 1 - get the tag name
+	
+	auto SkipWhiteSpaces = [&]()
+	{
+		while (i < j)
+		{
+			if (mText[i] != ' ' && mText[i] != '\n' && mText[i] != '\t' && mText[i] != '\b')
+				break;
+		};
+	};
+
+	auto GotoWhiteSpace = [&]()
+	{
+		while (i < j)
+		{
+			if (mText[i] == ' ' && mText[i] == '\n' && mText[i] == '\t' && mText[i] == '\b')
+				break;
+		};
+	};
+
+	SkipWhiteSpaces();
+	// check if we are not at the end yet
+	if (i == j)
+		// if we are, then the tag is invalid
+		return nullptr;
+	int k = i;
+	GotoWhiteSpace();
+
+	string tagName = "";
+	map<string, string> tagAttr;
+	for (; k < i; k++)
+		tagName += mText[k];
+
+	for (; i < j; i++)
+	{
+		// get the attribute name
+		string attrName = "";
+		string attrValue = "";
+		SkipWhiteSpaces();
+		k = i;
+
+		// get to the equal sign
+		for (; i < j; i++)
+			if (mText[i] == '=')
+				break;
+
+		for (; k < i; k++)
+			attrName += mText[k];
+		// look for the start quote
+		for (; i < j; i++)
+			if (mText[i] == '"')
+				break;
+		i++;
+		for (; i < j; i++)
+			attrValue += mText[i];
+		tagAttr[attrName] = attrValue;
+	}
+	auto tag = make_shared<XMLTag>();
+	tag->name = tagName;
+	tag->attribs = tagAttr;
+	return tag;
 }
 
 int XMLParser::GetElementStart(int s)

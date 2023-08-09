@@ -7,7 +7,7 @@ struct XMLTag
 	string name;
 
 	/*! parent of the XMLTag in the XML DOM */
-	XMLTag* parent = nullptr;
+	shared_ptr<XMLTag> parent = nullptr;
 
 	/*! attributes of the xml tag stored as key value pairs */
 	map<string, string> attribs;
