@@ -1,140 +1,146 @@
 #include "xml_parser.h"
-#include <iostream>
 
-XMLParser::XMLParser(string text)
+namespace Maple
 {
-	mText = text;
+Parser::Parser(std::string text)
+	: mText(text)
+{}
+
+std::shared_ptr<Element> Parser::Next()
+{
+	for (; mCurrentIndex < mText.size(); mCurrentIndex++)
+	{
+		if (mText[mCurrentIndex] == '<')
+		{
+			if (mText[mCurrentIndex + 1] == '/')
+				return ParseEndTag();
+			else
+				return ParseBeginTag();
+		}
+	}
+	return nullptr;
 }
 
-shared_ptr<XMLTag> XMLParser::Parse()
+std::shared_ptr<Element> Parser::ParseBeginTag()
 {
-	shared_ptr<XMLTag> tag = nullptr;
-	mParentStack.push(tag);
-	// the start and end element bounds
-	int s = 0, e = 0;
-	for (int i = 0; i < (int)mText.size(); i++)
+	// regex for begin tag
+	// text = [a..zA..z]+[a..zA..Z0..9]*
+	// alpha_num = [0..9a..zA..Z_] // only letter and numbers at the moment
+	// string = [alpha_num|ws]*
+	// <$text(ws)+($text="$string")*>
+	
+	int state = 0;
+	const int END_STATE = 8;
+	std::string tempString = "";
+	std::string tagName = "";
+	std::string aName = "";
+	std::string aValue = "";
+	std::map<std::string, std::string> attributes;
+
+	for (; mCurrentCounter < mText.size(); mCurrentCounter++)
 	{
-		if (mText[i] == '<')
+		char c = mText[mCurrentCounter];
+		CharType t = GetType(c);
+		switch(state)
 		{
-			// we have either found an opening tag
-			// or a closing tag
-			
-			// if it is an opening tag
-			if (mText[i + 1] != '/')
+		case 0:
+			switch(t)
 			{
-				// look for the '>' tag
-				int j = i;
-				for (; j < (int)mText.size(); j++)
-				{
-					if (mText[j] == '>')
-						break;
-				}
-				auto tag_temp = ProcessTag(i, j);
-				if (!tag_temp)
-					continue;
-				tag = tag_temp;
-				tag->parent = mParentStack.top();
-				mParentStack.push(tag);
+			case LETTER:
+				state = 1;
+				tempString += c;
+				break;
+			case WS:
+				break;
+			default:
+				state = END_STATE;
+				break;
 			}
-			// or a closing tag
-			else if (mText[i + 1] == '/')
+			break;
+		case 1:
+			switch(t)
 			{
-				if (mParentStack.empty())
-					break;
-				mParentStack.pop();
-				if (mParentStack.top())
-					mParentStack.top()->children.push_back(tag);
+			case LETTER:
+				tempString += c;
+				break;
+			case NUMBER:
+				tempString += c;
+				break;
+			case WS:
+				tagName = tempString;
+				tempString = "";
+				state = 2;
+			default:
+				state = END_STATE;
+				break;
+			}
+			break;
+		case 2:
+			switch(t)
+			{
+			case WS:
+				break;
+			case LETTER:
+				aName += c;
+				break;
+			default:
+				state = END_STATE;
+				break;
+			}
+			break;
+		case 3:
+			switch(t)
+			{
+			case LETTER:
+				aName += c;
+				break;
+			case NUMBER:
+				aName += c;
+				break;
+			case WS:
+				state = 4;
+				break;
+			case EQ:
+				state = 5;
+				break;
+			default:
+				state = END_STATE;
+				break;
+			}
+			break;
+		case 6:
+			switch(t)
+			{
+			case LETTER:
+				aValue += c;
+				break;
+			case NUMBER:
+				aValue += c;
+				break;
+			case WS:
+				aValue += c;
+				break;
+				
 			}
 		}
 	}
-	return GetRoot(tag);
 }
 
-shared_ptr<XMLTag> XMLParser::GetRoot(shared_ptr<XMLTag> tag)
+std::shared_ptr<Element> Parser::ParseEndTag()
 {
-	auto parent = tag;
-	if (parent == nullptr)
-		return nullptr;
-	while (tag->parent != nullptr)
-	{
-		tag = tag->parent;
-	}
-	return tag;
+	return nullptr;
 }
 
-shared_ptr<XMLTag> XMLParser::ProcessTag(int i, int j)
+CharType Parser::GetType(char c)
 {
-	// steps
-	// 1 - get the tag name
-	// 2 - get the next attrib name
-	// 3 - get the next attrib value
-	// 4 - repeat 2 to 3 until we reach the end
-	//
-	
-	// 1 - get the tag name
-	
-	auto SkipWhiteSpaces = [&]()
-	{
-		while (i < j)
-		{
-			if (mText[i] != ' ' && mText[i] != '\n' && mText[i] != '\t' && mText[i] != '\b')
-				break;
-			i++;
-		};
-	};
+	if (c == '"') return CharType::QUOTE;
+	else if(c == '<') return CharType::BEGIN_ANGLE_BRACKET;
+	else if(c == '>') return CharType::END_ANGLE_BRACKET;
+	else if(c == ' ' || c == '\n' || c == '\t') return CharType::WS;
+	else if(c >= '0' && c <= '9' ) return CharType::NUMBER;
+	else if((c >= 'a' && c <= 'z') || (c >= 'A' && c <='Z')) return CharType::LETTER;
+	return CharType::OTHER;
 
-	auto GotoWhiteSpace = [&]()
-	{
-		while (i < j)
-		{
-			if (mText[i] == ' ' && mText[i] == '\n' && mText[i] == '\t' && mText[i] == '\b')
-				break;
-			i++;
-		};
-	};
-
-	i++;
-	SkipWhiteSpaces();
-	// check if we are not at the end yet
-	if (i == j)
-		// if we are, then the tag is invalid
-		return nullptr;
-	int k = i;
-	GotoWhiteSpace();
-
-	string tagName = "";
-	map<string, string> tagAttr;
-	for (; k < i; k++)
-		tagName += mText[k];
-
-	for (; i < j; i++)
-	{
-		// get the attribute name
-		string attrName = "";
-		string attrValue = "";
-		SkipWhiteSpaces();
-		k = i;
-
-		// get to the equal sign
-		for (; i < j; i++)
-			if (mText[i] == '=')
-				break;
-
-		for (; k < i; k++)
-			attrName += mText[k];
-		// look for the start quote
-		for (; i < j; i++)
-			if (mText[i] == '"')
-				break;
-		i++;
-		// look for the end quote
-		for (; i < j && mText[i] != '"'; i++)
-			attrValue += mText[i];
-		tagAttr[attrName] = attrValue;
-		i++;
-	}
-	auto tag = make_shared<XMLTag>();
-	tag->name = tagName;
-	tag->attribs = tagAttr;
-	return tag;
 }
+
+};
